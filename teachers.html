@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>名师团队 | 菁华教育网课平台</title>
+  <meta name="description" content="菁华教育师资团队：高考数学于杰庭、初中数学林清和、语文苏文清、日语顾晓岚、英语陆铭远、物理化学韩卓。" />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="chromeTop"></div>
+
+  <main>
+    <section class="page-head">
+      <div class="wrap">
+        <div class="crumbs"><a href="index.html">首页</a> <span>/</span> <span>名师团队</span></div>
+        <h1>名师团队</h1>
+        <p class="desc">菁华教育的每一位主讲都要经过三轮试讲与一学期的学员评分考核。我们相信，好的老师不是讲得多，而是让学生学得会。</p>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div class="teacher-grid" id="grid"></div>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap" id="details"></div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="cta">
+          <div>
+            <h2>想成为菁华的授课老师？</h2>
+            <p>我们长期招募中高考、留学语言方向的兼职与全职主讲。要求三年以上一线教学经验，可提供完整课程方案与试讲视频。</p>
+          </div>
+          <button class="btn btn-gold btn-lg" id="joinBtn">投递简历</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/content-overrides.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    JH.mountChrome("teachers");
+
+    const T = JH_DATA.teachers;
+    const coursesOf = (id) => JH_DATA.courses.filter((c) => c.teacher === id);
+
+    JH.$("#grid").innerHTML = T.map(
+      (t) => `
+      <a class="teacher-card" href="#${t.id}">
+        <div class="teacher-top">
+          <div class="teacher-ava" style="background:${JH.grad(t.hue)}">${t.avatar}</div>
+          <div>
+            <h3 data-e="teacher.${t.id}.name">${t.name}</h3>
+            <div class="tt" data-e="teacher.${t.id}.title">${t.title}</div>
+            <div class="ts" data-e="teacher.${t.id}.school">${t.school}</div>
+          </div>
+        </div>
+        <div class="teacher-quote" data-e="teacher.${t.id}.tagline">${t.tagline}</div>
+        <div class="teacher-tags">${t.tags.map((x) => `<span class="tag-mini">${x}</span>`).join("")}</div>
+        <div class="teacher-stats">
+          <div><b>${t.hours}</b>授课课时</div>
+          <div><b>${t.students.toLocaleString("zh-CN")}</b>在读学员</div>
+          <div><b>${t.rating.toFixed(1)}</b>评分</div>
+        </div>
+      </a>`
+    ).join("");
+
+    JH.$("#details").innerHTML = T.map((t) => {
+      const list = coursesOf(t.id);
+      return `
+      <div class="teacher-detail" id="${t.id}">
+        <div class="teacher-profile">
+          <div class="ava-xl" style="background:${JH.grad(t.hue)}">${t.avatar}</div>
+          <h3 data-e="teacher.${t.id}.name">${t.name}</h3>
+          <div class="tp-role" data-e="teacher.${t.id}.title">${t.title}</div>
+          <div class="tp-school" data-e="teacher.${t.id}.school">${t.school}</div>
+          <div class="tp-stats">
+            <div><b>${t.rating.toFixed(1)}</b><span>学员评分</span></div>
+            <div><b>${t.hours}</b><span>授课课时</span></div>
+            <div><b>${t.students.toLocaleString("zh-CN")}</b><span>在读学员</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="panel">
+            <h3>${t.name} 老师简介</h3>
+            <div class="teacher-quote" style="margin-top:0" data-e="teacher.${t.id}.tagline">${t.tagline}</div>
+            <p class="desc-text" style="margin-top:16px" data-e="teacher.${t.id}.intro">${t.intro}</p>
+            <div class="teacher-tags">${t.tags.map((x) => `<span class="tag-mini">${x}</span>`).join("")}</div>
+          </div>
+          <div class="panel">
+            <h3>${t.name} 老师主讲的课程</h3>
+            <div style="display:grid;gap:14px">
+              ${
+                list.length
+                  ? list
+                      .map((c) => {
+                        const p = JH.progressOf(c);
+                        const has = JH.state.owned.indexOf(c.id) > -1;
+                        return `
+                  <div style="display:flex;gap:14px;align-items:center;border:1px solid var(--line);border-radius:var(--r-md);padding:14px">
+                    <div style="width:74px;height:54px;border-radius:12px;flex-shrink:0;display:grid;place-items:center;color:#fff;font-size:22px;font-weight:800;background:${JH.grad(c.hue)}">${c.glyph}</div>
+                    <div style="min-width:0;flex:1">
+                      <a href="course.html?id=${c.id}" style="font-size:15px;font-weight:700;line-height:1.4" data-e="course.${c.id}.title">${JH.esc(c.title)}</a>
+                      <div style="font-size:12.5px;color:var(--muted);margin-top:4px">${c.lessonCount} 课时 · ${c.hours} 小时 · 评分 ${c.rating.toFixed(1)} · ${c.students.toLocaleString("zh-CN")} 人在学</div>
+                    </div>
+                    <div style="text-align:right;flex-shrink:0">
+                      ${
+                        has
+                          ? `<div style="font-size:12.5px;color:var(--brand);font-weight:700">已报名 ${p.pct}%</div>
+                             <a class="btn btn-outline btn-sm" style="margin-top:6px" href="course.html?id=${c.id}">继续学习</a>`
+                          : `<div style="font-size:16px;font-weight:800;color:var(--rose)">¥${c.price}</div>
+                             <button class="btn btn-outline btn-sm" style="margin-top:6px" data-add="${c.id}">加入购物车</button>`
+                      }
+                    </div>
+                  </div>`;
+                      })
+                      .join("")
+                  : '<p style="color:var(--muted);font-size:14px">课程正在筹备中。</p>'
+              }
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+
+    JH.$("#joinBtn").addEventListener("click", () => JH.toast("简历投递邮箱：hr@jinghua-edu.cn"));
+
+    /* 直接访问 #teacher-id 时自动滚动定位 */
+    if (location.hash) {
+      const el = document.querySelector(location.hash);
+      if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+    }
+  </script>
+</body>
+</html>

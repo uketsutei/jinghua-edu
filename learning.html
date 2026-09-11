@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>我的学习 | 菁华教育网课平台</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="chromeTop"></div>
+
+  <main>
+    <section class="learn-hero">
+      <div class="wrap">
+        <div class="ava-big" id="userAva">学</div>
+        <div>
+          <h1 id="greeting">你好，同学</h1>
+          <p class="tip" id="greetTip">今天也要继续学习哦，坚持 30 分钟就会有明显的不同。</p>
+        </div>
+        <div class="learn-stats" id="learnStats"></div>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div id="noticeSlot"></div>
+
+        <div class="tabs" id="tabs">
+          <button data-tab="all" class="active">全部课程</button>
+          <button data-tab="doing">学习中</button>
+          <button data-tab="done">已完成</button>
+        </div>
+
+        <div class="learn-list" id="list"></div>
+        <div class="empty hide" id="empty">
+          <b>这里还没有课程</b>
+          <p>先去课程中心挑一门感兴趣的课吧，第一节都可以免费试听。</p>
+          <a class="btn btn-primary" style="margin-top:18px" href="courses.html">去选课</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div class="sec-head">
+          <div>
+            <p class="eyebrow">RECOMMENDED</p>
+            <h2>为你推荐</h2>
+            <p class="sub">根据你已报名的课程，教研组挑选了这些可以接着学的课。</p>
+          </div>
+          <a class="more-link" href="courses.html">更多课程 →</a>
+        </div>
+        <div class="course-grid" id="reco"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/content-overrides.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    JH.mountChrome("learning");
+
+    const params = new URLSearchParams(location.search);
+    let tab = "all";
+
+    /* ---------- 用户信息 ---------- */
+    const user = JH.state.user;
+    if (user) {
+      JH.$("#userAva").textContent = user.name.slice(0, 1);
+      JH.$("#greeting").textContent = "你好，" + user.name;
+    } else {
+      JH.$("#userAva").textContent = "游";
+      JH.$("#greeting").textContent = "你好，访客";
+      JH.$("#greetTip").textContent = "以下为演示学习数据，注册登录后你的学习记录会一直保留。";
+    }
+
+    if (params.get("welcome") === "1") {
+      setTimeout(() => JH.toast("报名成功，开始你的第一节课吧"), 500);
+    }
+
+    if (!user) {
+      JH.$("#noticeSlot").innerHTML = `
+        <div class="demo-tip" style="margin-bottom:26px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <span style="flex:1;min-width:220px">当前未登录，页面展示的是示例学习数据。登录后可以保存进度、笔记与作业记录。</span>
+          <a class="btn btn-primary btn-sm" href="login.html?next=learning.html">立即登录 / 注册</a>
+        </div>`;
+    } else {
+      JH.$("#noticeSlot").innerHTML = `
+        <div class="demo-tip" style="margin-bottom:26px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <span style="flex:1;min-width:220px">其中「高考数学 · 解析几何专题突破」与「高考日语 · 零基础到 N3 全阶课程」为演示课程，用于展示学习进度功能。</span>
+          <button class="btn btn-outline btn-sm" id="clearDemo">清空演示课程</button>
+        </div>`;
+      JH.$("#clearDemo").addEventListener("click", () => {
+        JH.state.owned = [];
+        JH.state.progress = {};
+        JH.save();
+        location.reload();
+      });
+    }
+
+    /* ---------- 数据 ---------- */
+    const myCourses = JH.state.owned.map(JH.getCourse).filter(Boolean);
+
+    function totalDone() {
+      return myCourses.reduce((s, c) => s + (JH.state.progress[c.id] || []).length, 0);
+    }
+    function totalLessons() {
+      return myCourses.reduce((s, c) => s + c.lessons.length, 0);
+    }
+
+    JH.$("#learnStats").innerHTML = `
+      <div><b>${myCourses.length}</b><span>在学课程</span></div>
+      <div><b>${totalDone()}</b><span>已完成课时</span></div>
+      <div><b>${Math.round(totalDone() * 0.42 * 10) / 10}h</b><span>累计学习时长</span></div>
+      <div><b>${myCourses.length ? Math.round((totalDone() / totalLessons()) * 100) : 0}%</b><span>总体完成度</span></div>`;
+
+    /* ---------- 列表 ---------- */
+    function nextLesson(course) {
+      const done = JH.state.progress[course.id] || [];
+      return course.lessons.find((l) => done.indexOf(l.id) === -1) || course.lessons[course.lessons.length - 1];
+    }
+
+    function renderList() {
+      const items = myCourses.filter((c) => {
+        const p = JH.progressOf(c);
+        if (tab === "doing") return p.pct < 100;
+        if (tab === "done") return p.pct === 100;
+        return true;
+      });
+
+      JH.$("#list").classList.toggle("hide", !items.length);
+      JH.$("#empty").classList.toggle("hide", items.length > 0 || myCourses.length > 0);
+
+      JH.$("#list").innerHTML = items
+        .map((c) => {
+          const p = JH.progressOf(c);
+          const nl = nextLesson(c);
+          const finished = p.pct === 100;
+          return `
+          <div class="learn-item">
+            <div class="li-cover">${JH.coverHTML(c, { showBadge: false })}</div>
+            <div class="li-main">
+              <h4 data-e="course.${c.id}.title">${JH.esc(c.title)}</h4>
+              <div class="li-sub">${JH.esc(c.teacherName)} · ${c.lessonCount} 课时 · 最近学习：${JH.esc(nl.title)}</div>
+              <div class="li-bar">
+                <div class="bar"><i style="width:${p.pct}%"></i></div>
+                <span>${finished ? "已全部完成" : "已完成 " + p.done + "/" + p.total + " 课时（" + p.pct + "%）"}</span>
+              </div>
+            </div>
+            <div class="li-act">
+              <a class="btn btn-primary btn-sm" href="course.html?id=${c.id}">${finished ? "复习课程" : "继续学习"}</a>
+              <a class="btn btn-outline btn-sm" href="course.html?id=${c.id}">课程详情</a>
+            </div>
+          </div>`;
+        })
+        .join("");
+    }
+
+    if (!myCourses.length) {
+      JH.$("#list").classList.add("hide");
+      JH.$("#empty").classList.remove("hide");
+    }
+
+    document.addEventListener("click", (e) => {
+      const t = e.target.closest("#tabs button");
+      if (t) {
+        tab = t.getAttribute("data-tab");
+        document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b === t));
+        renderList();
+      }
+    });
+
+    /* ---------- 推荐 ---------- */
+    const owned = JH.state.owned;
+    const reco = JH_DATA.courses
+      .filter((c) => owned.indexOf(c.id) === -1)
+      .sort((a, b) => b.rating - a.rating)
+      .slice(0, 3);
+    JH.$("#reco").innerHTML = reco.map(JH.courseCard).join("");
+
+    renderList();
+  </script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>课程中心 | 菁华教育网课平台</title>
+  <meta name="description" content="菁华教育全部在线课程：小学数学思维、中考数学、高考数学、高考日语、雅思写作、高中物理等。" />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="chromeTop"></div>
+
+  <main>
+    <section class="page-head">
+      <div class="wrap">
+        <div class="crumbs"><a href="index.html">首页</a> <span>/</span> <span>课程中心</span></div>
+        <h1>课程中心</h1>
+        <p class="desc">共 320+ 门课程在售，以下为平台重点推荐的精品课程。支持按学段、学科、难度筛选，所有课程第一节均可免费试听。</p>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap catalog">
+        <aside class="filters">
+          <div class="filter-group">
+            <h4>学段</h4>
+            <div class="chips" id="stageChips"></div>
+          </div>
+          <div class="filter-group">
+            <h4>学科</h4>
+            <div class="chips" id="subjectChips"></div>
+          </div>
+          <div class="filter-group">
+            <h4>难度</h4>
+            <div class="chips" id="levelChips"></div>
+          </div>
+          <div class="filter-group">
+            <h4>价格上限</h4>
+            <div class="price-range">
+              <input type="range" id="priceRange" min="299" max="899" step="50" value="899" />
+              <span id="priceLabel">不限</span>
+            </div>
+          </div>
+          <div class="filter-group">
+            <button class="btn btn-outline btn-sm btn-block" id="resetBtn">重置筛选条件</button>
+          </div>
+        </aside>
+
+        <div>
+          <div class="toolbar">
+            <span class="count">共找到 <b id="resultCount">0</b> 门课程</span>
+            <div class="sorts" id="sorts">
+              <button data-sort="default" class="active">综合</button>
+              <button data-sort="hot">人气</button>
+              <button data-sort="rating">评分</button>
+              <button data-sort="price">价格</button>
+            </div>
+          </div>
+          <div class="course-grid" id="grid"></div>
+          <div class="empty hide" id="empty">
+            <b>没有找到符合条件的课程</b>
+            <p>试着放宽筛选条件，或者直接联系课程顾问帮你推荐。</p>
+            <button class="btn btn-primary" style="margin-top:18px" id="emptyReset">重置筛选</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/content-overrides.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    JH.mountChrome("courses");
+
+    const params = new URLSearchParams(location.search);
+    const filter = {
+      stage: params.get("stage") || "全部",
+      subject: params.get("subject") || "全部",
+      level: params.get("level") || "全部",
+      q: params.get("q") || "",
+      price: 899,
+      sort: "default"
+    };
+    const LEVELS = ["入门", "进阶", "全阶"];
+
+    if (filter.q) {
+      const box = document.querySelector("#navSearch input");
+      if (box) box.value = filter.q;
+    }
+
+    function chipRow(host, options, key) {
+      host.innerHTML = options
+        .map(
+          (o) =>
+            `<button class="chip${filter[key] === o ? " active" : ""}" data-key="${key}" data-val="${o}">${o}</button>`
+        )
+        .join("");
+    }
+
+    function renderChips() {
+      chipRow(JH.$("#stageChips"), ["全部"].concat(JH_DATA.STAGES.filter((s) => s !== "考研")), "stage");
+      chipRow(JH.$("#subjectChips"), ["全部"].concat(JH_DATA.SUBJECTS), "subject");
+      chipRow(JH.$("#levelChips"), ["全部"].concat(LEVELS), "level");
+      JH.$("#priceLabel").textContent = filter.price >= 899 ? "不限" : "¥" + filter.price + " 以下";
+    }
+
+    function matched() {
+      const kw = filter.q.trim().toLowerCase();
+      let list = JH_DATA.courses.filter((c) => {
+        if (filter.stage !== "全部" && c.stage !== filter.stage) return false;
+        if (filter.subject !== "全部" && c.subject !== filter.subject) return false;
+        if (filter.level !== "全部" && c.level !== filter.level) return false;
+        if (c.price > filter.price) return false;
+        if (kw) {
+          const hay = (c.title + c.sub + c.teacherName + c.tags.join("") + c.stage + c.subject).toLowerCase();
+          if (hay.indexOf(kw) === -1) return false;
+        }
+        return true;
+      });
+
+      const by = {
+        default: (a, b) => Number(b.hot || 0) - Number(a.hot || 0) || b.students - a.students,
+        hot: (a, b) => b.students - a.students,
+        rating: (a, b) => b.rating - a.rating || b.ratingCount - a.ratingCount,
+        price: (a, b) => a.price - b.price
+      };
+      return list.sort(by[filter.sort] || by.default);
+    }
+
+    function render() {
+      const list = matched();
+      JH.$("#resultCount").textContent = list.length;
+      JH.$("#grid").innerHTML = list.map(JH.courseCard).join("");
+      JH.$("#grid").classList.toggle("hide", list.length === 0);
+      JH.$("#empty").classList.toggle("hide", list.length !== 0);
+      renderChips();
+      document.querySelectorAll("#sorts button").forEach((b) => {
+        b.classList.toggle("active", b.getAttribute("data-sort") === filter.sort);
+      });
+    }
+
+    document.addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip[data-key]");
+      if (chip) {
+        filter[chip.getAttribute("data-key")] = chip.getAttribute("data-val");
+        render();
+        return;
+      }
+      const sortBtn = e.target.closest("#sorts button");
+      if (sortBtn) {
+        filter.sort = sortBtn.getAttribute("data-sort");
+        render();
+        return;
+      }
+      if (e.target.closest("#resetBtn") || e.target.closest("#emptyReset")) {
+        filter.stage = filter.subject = filter.level = "全部";
+        filter.q = "";
+        filter.price = 899;
+        filter.sort = "default";
+        JH.$("#priceRange").value = 899;
+        const box = document.querySelector("#navSearch input");
+        if (box) box.value = "";
+        render();
+        history.replaceState(null, "", "courses.html");
+      }
+    });
+
+    JH.$("#priceRange").addEventListener("input", (e) => {
+      filter.price = Number(e.target.value);
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>课程详情 | 菁华教育网课平台</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="chromeTop"></div>
+
+  <main>
+    <section class="detail-hero">
+      <div class="wrap">
+        <div>
+          <div class="crumbs"><a href="index.html">首页</a> <span>/</span> <a href="courses.html">课程中心</a> <span>/</span> <span id="crumbTitle">课程详情</span></div>
+          <h1 id="courseTitle">加载中…</h1>
+          <p class="sub" id="courseSub"></p>
+          <div class="detail-tags" id="courseTags"></div>
+          <div class="detail-meta" id="courseMeta"></div>
+        </div>
+        <div id="buySlot"></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap detail-body">
+        <div>
+          <!-- 播放器 -->
+          <div class="panel" style="padding:0;overflow:hidden;border:none" id="playerPanel">
+            <div class="player-shell">
+              <div class="player-stage">
+                <div class="stage-grid"></div>
+                <div class="stage-inner">
+                  <span class="stage-badge" id="stageBadge">第 1 章 · 第 1 节</span>
+                  <h3 id="stageTitle">请选择课时开始学习</h3>
+                  <p id="stageDesc">演示播放器：进度条会随时间推进，完成后自动标记本节课已完成。</p>
+                  <button class="big-play" id="bigPlay" aria-label="播放">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6L19 12z" /></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="player-bar">
+                <div class="pb-line">
+                  <span id="timeNow">00:00</span>
+                  <div class="seek" id="seek"><i id="seekFill"></i></div>
+                  <span id="timeTotal">00:00</span>
+                </div>
+                <div class="pb-tools">
+                  <button id="prevBtn">上一节</button>
+                  <button id="nextBtn">下一节</button>
+                  <button id="doneBtn">标记为已完成</button>
+                  <button id="favBtn">加入收藏</button>
+                  <span class="rate">倍速
+                    <button id="rateBtn" style="border:none;padding:4px 8px">1.0×</button>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 亮点 -->
+          <div class="panel">
+            <h3>课程亮点</h3>
+            <ul class="highlight-list" id="highlightList"></ul>
+          </div>
+
+          <!-- 介绍 -->
+          <div class="panel">
+            <h3>课程介绍</h3>
+            <p class="desc-text" id="courseDesc"></p>
+          </div>
+
+          <!-- 目录 -->
+          <div class="panel">
+            <h3>课程目录</h3>
+            <p style="font-size:13.5px;color:var(--muted);margin-bottom:16px" id="curriculumTip"></p>
+            <div id="curriculum"></div>
+          </div>
+
+          <!-- 笔记 -->
+          <div class="panel">
+            <h3>课堂笔记</h3>
+            <div class="note-box">
+              <textarea id="noteInput" placeholder="记录本节课的重点、易错点或疑问，笔记会按课时保存……"></textarea>
+              <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+                <button class="btn btn-primary btn-sm" id="saveNote">保存笔记</button>
+                <span style="font-size:13px;color:var(--muted)" id="noteTarget">当前课时：未选择</span>
+              </div>
+            </div>
+            <div class="note-list" id="noteList"></div>
+          </div>
+
+          <!-- 评价 -->
+          <div class="panel">
+            <h3>学员评价</h3>
+            <div id="reviewList"></div>
+          </div>
+        </div>
+
+        <!-- 侧栏 -->
+        <aside>
+          <div class="side-teacher" id="teacherCard"></div>
+          <div class="panel" style="margin-top:24px">
+            <h3>相关课程</h3>
+            <div id="related" style="display:grid;gap:14px"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/content-overrides.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    JH.mountChrome("courses");
+
+    const params = new URLSearchParams(location.search);
+    const course = JH.getCourse(params.get("id")) || JH_DATA.courses[0];
+    const teacher = JH_DATA.teachers.find((t) => t.id === course.teacher);
+    const owned = () => JH.state.owned.indexOf(course.id) > -1;
+    const canPlay = (lesson) => owned() || lesson.free;
+
+    document.title = course.title + " | 菁华教育网课平台";
+
+    /* ---------- 头部信息 ---------- */
+    JH.$("#crumbTitle").textContent = course.title;
+    JH.$("#courseTitle").textContent = course.title;
+    JH.$("#courseSub").textContent = course.sub;
+    JH.$("#courseTitle").setAttribute("data-e", "course." + course.id + ".title");
+    JH.$("#courseSub").setAttribute("data-e", "course." + course.id + ".sub");
+    JH.$("#courseTags").innerHTML = [course.stage + course.subject, course.level]
+      .concat(course.tags)
+      .map((t) => `<span>${JH.esc(t)}</span>`)
+      .join("");
+    JH.$("#courseMeta").innerHTML = `
+      <div><b>${course.rating.toFixed(1)}</b><span>学员评分（${course.ratingCount} 条）</span></div>
+      <div><b>${course.lessonCount}</b><span>总课时</span></div>
+      <div><b>${course.hours}h</b><span>视频时长</span></div>
+      <div><b>${course.students.toLocaleString("zh-CN")}</b><span>在读学员</span></div>`;
+
+    /* ---------- 购买卡 ---------- */
+    function renderBuyCard() {
+      const off = Math.round((1 - course.price / course.original) * 100);
+      const has = owned();
+      JH.$("#buySlot").innerHTML = `
+        <div class="buy-card">
+          <div class="bc-cover">${JH.coverHTML(course, { showBadge: true })}</div>
+          ${
+            has
+              ? `<div class="p-row"><b style="font-size:22px">已报名</b></div>
+                 <p style="font-size:13.5px;color:var(--muted);margin-top:8px">你在「我的学习」中可以直接继续学习本课程。</p>
+                 <a class="btn btn-primary btn-block btn-lg" style="margin-top:18px" href="learning.html">进入我的学习</a>`
+              : `<div class="p-row"><b><span class="cur" data-nofe>¥</span><span data-e="course.${course.id}.price">${course.price}</span></b><s><span class="cur" data-nofe>¥</span><span data-e="course.${course.id}.old">${course.original}</span></s><span class="off">${off}% OFF</span></div>`
+          }
+          <div class="buy-list">
+            <div><i class="tick">✓</i> ${course.lessonCount} 个课时，永久回看</div>
+            <div><i class="tick">✓</i> 配套讲义与分层作业</div>
+            <div><i class="tick">✓</i> 作业逐题批改 + 班级答疑群</div>
+            <div><i class="tick">✓</i> 第一节免费试听</div>
+          </div>
+          ${
+            has
+              ? ""
+              : `<button class="btn btn-primary btn-lg btn-block" id="buyNow">立即购买</button>
+                 <button class="btn btn-outline btn-block" data-add="${course.id}">加入购物车</button>`
+          }
+          <p class="safe">支持 7 天无理由退款</p>
+        </div>`;
+      const bn = JH.$("#buyNow");
+      if (bn) {
+        bn.addEventListener("click", () => {
+          JH.addToCart(course.id, true);
+          JH.checkout();
+        });
+      }
+    }
+
+    /* ---------- 亮点 / 介绍 ---------- */
+    JH.$("#highlightList").innerHTML = course.highlights
+      .map((h, i) => `<li><span class="n">${i + 1}</span><span>${JH.esc(h)}</span></li>`)
+      .join("");
+    JH.$("#courseDesc").textContent = course.desc;
+    JH.$("#courseDesc").setAttribute("data-e", "course." + course.id + ".desc");
+
+    /* ---------- 目录 ---------- */
+    let firstPlayable = course.lessons.find(canPlay) || course.lessons[0];
+    let current = firstPlayable;
+
+    JH.$("#curriculumTip").innerHTML = owned()
+      ? "全部课时已解锁，点击任意课时即可开始学习。"
+      : '未报名的同学可点击带「试听」标签的课时免费学习，其余课时需购买后解锁。';
+
+    function renderCurriculum() {
+      const done = JH.state.progress[course.id] || [];
+      const byChapter = {};
+      course.lessons.forEach((l) => {
+        (byChapter[l.chapter] = byChapter[l.chapter] || []).push(l);
+      });
+      JH.$("#curriculum").innerHTML = course.chapters
+        .map((ch, ci) => {
+          const list = byChapter[ci] || [];
+          const mins = list.reduce((s, l) => s + l.minutes, 0);
+          return `
+          <div class="chapter${ci === 0 ? " open" : ""}" data-chapter="${ci}">
+            <div class="chapter-head">
+              <span class="idx">${ci + 1}</span>
+              <b data-e="course.${course.id}.ch${ci}">${JH.esc(ch.t.replace(/^第 \d+ 章\s*/, ""))}</b>
+              <span class="cm">${list.length} 课时 · ${mins} 分钟</span>
+              <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="chapter-body">
+              ${list
+                .map((l) => {
+                  const ok = done.indexOf(l.id) > -1;
+                  const locked = !canPlay(l);
+                  return `
+                <div class="lesson-row" data-lesson="${l.id}">
+                  <span class="play-dot">${
+                    ok
+                      ? "✓"
+                      : locked
+                      ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><rect x="4" y="10.5" width="16" height="10" rx="2.4"/><path d="M8 10.5V7.4a4 4 0 0 1 8 0v3.1"/></svg>'
+                      : "▶"
+                  }</span>
+                  <span>${JH.esc(l.title)}</span>
+                  ${l.free ? '<span class="free-tag">试听</span>' : ""}
+                  <span class="lm">${ok ? "已完成 · " : ""}${l.minutes} 分钟</span>
+                </div>`;
+                })
+                .join("")}
+            </div>
+          </div>`;
+        })
+        .join("");
+    }
+    renderCurriculum();
+
+    /* ---------- 播放器 ---------- */
+    const player = { playing: false, virtual: 0, rate: 1, timer: null };
+
+    function fmtTime(sec) {
+      const s = Math.max(0, Math.round(sec));
+      return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+    }
+
+    function totalSeconds() {
+      return current ? current.minutes * 60 : 0;
+    }
+
+    function paintPlayer() {
+      const total = totalSeconds();
+      const pct = total ? Math.min(100, (player.virtual / total) * 100) : 0;
+      JH.$("#seekFill").style.width = pct + "%";
+      JH.$("#timeNow").textContent = fmtTime(player.virtual);
+      JH.$("#timeTotal").textContent = fmtTime(total);
+      JH.$("#bigPlay").classList.toggle("playing", player.playing);
+      JH.$("#bigPlay").innerHTML = player.playing
+        ? '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>'
+        : '<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6L19 12z"/></svg>';
+    }
+
+    function loadLesson(lesson, autoplay, noScroll) {
+      if (!canPlay(lesson)) {
+        JH.addToCart(course.id, true);
+        JH.toast("该课时需购买后观看，可先试听第一节");
+        return;
+      }
+      current = lesson;
+      player.virtual = 0;
+      const ch = course.chapters[lesson.chapter];
+      JH.$("#stageBadge").textContent = `第 ${lesson.chapter + 1} 章 · ${lesson.title}`;
+      JH.$("#stageTitle").textContent = ch.t.replace(/^第 \d+ 章\s*/, "");
+      JH.$("#stageDesc").textContent = current.free && !owned()
+        ? "免费试听课时 · 讲师：" + teacher.name
+        : "主讲：" + teacher.name + " · 演示播放器，进度条随讲解推进";
+      JH.$("#noteTarget").textContent = "当前课时：" + lesson.title;
+      JH.$("#noteInput").value = (JH.state.notes[course.id + ":" + lesson.id] || {}).text || "";
+      paintPlayer();
+      renderNotes();
+      paintPlayer();
+      if (autoplay) start();
+      if (!noScroll) JH.$("#playerPanel").scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function tick() {
+      const total = totalSeconds();
+      player.virtual += (total / 26) * player.rate;
+      if (player.virtual >= total) {
+        player.virtual = total;
+        stop();
+        complete(current);
+      }
+      paintPlayer();
+    }
+
+    function start() {
+      if (!current) return;
+      if (player.virtual >= totalSeconds()) player.virtual = 0;
+      player.playing = true;
+      clearInterval(player.timer);
+      player.timer = setInterval(tick, 1000);
+      paintPlayer();
+    }
+
+    function stop() {
+      player.playing = false;
+      clearInterval(player.timer);
+      paintPlayer();
+    }
+
+    function complete(lesson) {
+      if (!lesson) return;
+      const arr = JH.state.progress[course.id] || (JH.state.progress[course.id] = []);
+      if (arr.indexOf(lesson.id) === -1) {
+        arr.push(lesson.id);
+        JH.save();
+        renderCurriculum();
+        JH.toast("已完成本节：" + lesson.title);
+      }
+    }
+
+    JH.$("#bigPlay").addEventListener("click", () => (player.playing ? stop() : start()));
+    JH.$("#seek").addEventListener("click", (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      const ratio = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+      player.virtual = ratio * totalSeconds();
+      paintPlayer();
+    });
+    JH.$("#prevBtn").addEventListener("click", () => {
+      const i = course.lessons.indexOf(current);
+      loadLesson(course.lessons[Math.max(0, i - 1)], player.playing);
+    });
+    JH.$("#nextBtn").addEventListener("click", () => {
+      const i = course.lessons.indexOf(current);
+      loadLesson(course.lessons[Math.min(course.lessons.length - 1, i + 1)], player.playing);
+    });
+    JH.$("#doneBtn").addEventListener("click", () => complete(current));
+    JH.$("#favBtn").addEventListener("click", (e) => {
+      const on = e.currentTarget.textContent === "已收藏";
+      e.currentTarget.textContent = on ? "加入收藏" : "已收藏";
+      JH.toast(on ? "已取消收藏" : "已收藏：" + course.title);
+    });
+    JH.$("#rateBtn").addEventListener("click", (e) => {
+      const rates = [1, 1.25, 1.5, 2];
+      const i = (rates.indexOf(player.rate) + 1) % rates.length;
+      player.rate = rates[i];
+      e.currentTarget.textContent = player.rate.toFixed(i === 0 ? 1 : 2) + "×";
+    });
+
+    document.addEventListener("click", (e) => {
+      const row = e.target.closest(".lesson-row");
+      if (row) {
+        const l = course.lessons.find((x) => x.id === row.getAttribute("data-lesson"));
+        if (l) loadLesson(l, false);
+        return;
+      }
+      const head = e.target.closest(".chapter-head");
+      if (head) head.parentNode.classList.toggle("open");
+    });
+
+    /* ---------- 笔记 ---------- */
+    function renderNotes() {
+      const list = Object.keys(JH.state.notes)
+        .filter((k) => k.indexOf(course.id + ":") === 0)
+        .map((k) => Object.assign({ key: k }, JH.state.notes[k]))
+        .sort((a, b) => (a.at < b.at ? 1 : -1));
+      JH.$("#noteList").innerHTML = list.length
+        ? list
+            .map(
+              (n) => `
+          <div class="note-item">
+            <div class="nt"><span>${JH.esc(n.lesson || "课程笔记")}</span><span>${JH.esc(n.at || "")}</span></div>
+            ${JH.esc(n.text)}
+          </div>`
+            )
+            .join("")
+        : '<p style="font-size:13.5px;color:var(--muted)">还没有笔记，边听课边记下重点吧。</p>';
+    }
+
+    JH.$("#saveNote").addEventListener("click", () => {
+      const text = JH.$("#noteInput").value.trim();
+      if (!text) {
+        JH.toast("笔记内容不能为空", false);
+        return;
+      }
+      const key = course.id + ":" + current.id;
+      JH.state.notes[key] = { text: text, lesson: current.title, at: new Date().toLocaleString("zh-CN", { hour12: false }) };
+      JH.save();
+      renderNotes();
+      JH.toast("笔记已保存");
+    });
+
+    /* ---------- 评价 ---------- */
+    JH.$("#reviewList").innerHTML = course.reviews
+      .map(
+        (r) => `
+      <div style="padding:16px 0;border-bottom:1px dashed var(--line)">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="ava" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;background:${JH.grad(course.hue)}">${JH.esc(r.name.slice(0, 1))}</span>
+          <b style="font-size:14.5px">${JH.esc(r.name)}同学</b>
+          <span class="stars">${JH.stars(r.stars)}</span>
+          <span style="margin-left:auto;font-size:12.5px;color:var(--muted-2)">${JH.esc(r.date)}</span>
+        </div>
+        <p style="margin-top:10px;font-size:14.5px;color:var(--ink-2)">${JH.esc(r.text)}</p>
+      </div>`
+      )
+      .join("");
+
+    /* ---------- 侧栏 ---------- */
+    const p = JH.progressOf(course);
+    JH.$("#teacherCard").innerHTML = `
+      <div class="st-top">
+        <div class="ava" style="background:${JH.grad(teacher.hue)}">${teacher.avatar}</div>
+        <div>
+          <h4 data-e="teacher.${teacher.id}.name">${teacher.name}</h4>
+          <div class="role" data-e="teacher.${teacher.id}.title">${teacher.title}</div>
+        </div>
+      </div>
+      <div class="school" style="font-size:12.5px;color:var(--muted-2);margin-top:10px">${teacher.school}</div>
+      <div class="bio">${teacher.intro}</div>
+      <div class="side-mini">
+        <div><span>学员评分</span><b>${teacher.rating.toFixed(1)} / 5.0</b></div>
+        <div><span>累计授课</span><b>${teacher.hours} 课时</b></div>
+        <div><span>在读学员</span><b>${teacher.students.toLocaleString("zh-CN")}</b></div>
+        ${owned() ? `<div><span>我的进度</span><b>${p.done}/${p.total} 课时</b></div>` : ""}
+      </div>
+      <a class="btn btn-outline btn-block" style="margin-top:18px" href="teachers.html#${teacher.id}">查看老师主页</a>`;
+
+    const related = JH_DATA.courses
+      .filter((c) => c.id !== course.id && (c.subject === course.subject || c.stage === course.stage))
+      .slice(0, 3);
+    JH.$("#related").innerHTML = related
+      .map(
+        (c) => `
+      <a href="course.html?id=${c.id}" style="display:flex;gap:12px;align-items:center">
+        <div style="width:64px;height:46px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;color:#fff;font-weight:800;background:${JH.grad(c.hue)}">${c.glyph}</div>
+        <div style="min-width:0">
+          <div style="font-size:14px;font-weight:700;line-height:1.4" data-e="course.${c.id}.title">${JH.esc(c.title)}</div>
+          <div style="font-size:12.5px;color:var(--rose);font-weight:700;margin-top:2px">¥${c.price}</div>
+        </div>
+      </a>`
+      )
+      .join("");
+
+    renderBuyCard();
+    loadLesson(firstPlayable, false, true);
+    player.virtual = 0;
+    paintPlayer();
+  </script>
+</body>
+</html>
