@@ -4,8 +4,8 @@
   "private": true,
   "description": "菁华教育网课平台 · 全栈版（静态站点 + Node/SQLite 后端）",
   "scripts": {
-    "start": "node server/server.js",
-    "dev": "node server/server.js"
+    "start": "node --experimental-sqlite server/server.js",
+    "dev": "node --experimental-sqlite server/server.js"
   },
   "engines": {
     "node": ">=22.5.0"

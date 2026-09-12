@@ -13,7 +13,21 @@ const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { DatabaseSync } = require("node:sqlite");
+
+let DatabaseSync;
+try {
+  DatabaseSync = require("node:sqlite").DatabaseSync;
+} catch (e) {
+  console.error("");
+  console.error("  启动失败：当前 Node 版本没有内置数据库模块 node:sqlite。");
+  console.error("  当前版本：" + process.version);
+  console.error("");
+  console.error("  解决办法二选一：");
+  console.error("    1) 升级 Node 到 22.5 以上（推荐 24），下载地址 https://nodejs.org/");
+  console.error("    2) 启动命令加上参数：node --experimental-sqlite server/server.js");
+  console.error("");
+  process.exit(1);
+}
 
 const ROOT = path.join(__dirname, "..");
 const DATA_DIR = path.join(__dirname, "data");

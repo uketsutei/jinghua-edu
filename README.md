@@ -57,6 +57,10 @@ node server/server.js
 
 ### 4. 部署到公网（让别人不用开你的电脑也能访问）
 
+> 📄 完整的图文步骤在 **[DEPLOY.md](DEPLOY.md)**，最省事的方式是点这个链接一键部署：
+> **https://render.com/deploy?repo=https://github.com/uketsutei/jinghua-edu**
+> （用 GitHub 账号授权即可，不用另外注册）
+
 GitHub Pages 只能放静态页面，**跑不了后端**。要让后端上线，选任意一个支持 Node 的平台，
 把整个项目文件夹传上去即可（已带好 `package.json`，平台会自动识别）：
 

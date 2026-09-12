@@ -5,5 +5,5 @@ echo.
 echo   正在启动菁华教育网课平台...
 echo.
 start "" http://localhost:3000/
-node server\server.js
+node --experimental-sqlite server\server.js
 pause
