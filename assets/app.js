@@ -739,7 +739,10 @@
       const info = window.JH_API ? JH_API.githubInfo() : null;
       if (window.JH_API && info && info.hasToken) {
         const r = await JH_API.githubPublish(data);
-        if (r.ok) toast("已提交到 GitHub" + (r.commit ? "（" + r.commit + "）" : "") + "，约 1 分钟后全站生效");
+        if (r.ok) {
+          updateModeLabel();
+          toast("已提交到 GitHub" + (r.commit ? "（" + r.commit + "）" : "") + "，约 1 分钟后全站生效");
+        }
         else toast("发布失败：" + r.error, false);
         return;
       }
@@ -869,6 +872,7 @@
         return;
       }
       bar.classList.toggle("open");
+      if (bar.classList.contains("open")) updateModeLabel();
     });
     $("#epClose").addEventListener("click", () => bar.classList.remove("open"));
     $("#epStart").addEventListener("click", () => {
