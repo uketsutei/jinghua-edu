@@ -58,6 +58,7 @@
 
   <script src="assets/data.js"></script>
   <script src="assets/content-overrides.js"></script>
+  <script src="assets/api.js"></script>
   <script src="assets/app.js"></script>
   <script>
     JH.mountChrome("learning");
@@ -101,7 +102,7 @@
     }
 
     /* ---------- 数据 ---------- */
-    const myCourses = JH.state.owned.map(JH.getCourse).filter(Boolean);
+    let myCourses = [];
 
     function totalDone() {
       return myCourses.reduce((s, c) => s + (JH.state.progress[c.id] || []).length, 0);
@@ -110,11 +111,18 @@
       return myCourses.reduce((s, c) => s + c.lessons.length, 0);
     }
 
-    JH.$("#learnStats").innerHTML = `
+    function renderStats() {
+      JH.$("#learnStats").innerHTML = `
       <div><b>${myCourses.length}</b><span>在学课程</span></div>
       <div><b>${totalDone()}</b><span>已完成课时</span></div>
       <div><b>${Math.round(totalDone() * 0.42 * 10) / 10}h</b><span>累计学习时长</span></div>
       <div><b>${myCourses.length ? Math.round((totalDone() / totalLessons()) * 100) : 0}%</b><span>总体完成度</span></div>`;
+      const u = JH.state.user;
+      if (u) {
+        JH.$("#greeting").textContent = "你好，" + u.name;
+        JH.$("#userAva").textContent = u.name.slice(0, 1);
+      }
+    }
 
     /* ---------- 列表 ---------- */
     function nextLesson(course) {
@@ -158,9 +166,14 @@
         .join("");
     }
 
-    if (!myCourses.length) {
-      JH.$("#list").classList.add("hide");
-      JH.$("#empty").classList.remove("hide");
+    function refresh() {
+      myCourses = JH.state.owned.map(JH.getCourse).filter(Boolean);
+      renderStats();
+      renderList();
+      if (!myCourses.length) {
+        JH.$("#list").classList.add("hide");
+        JH.$("#empty").classList.remove("hide");
+      }
     }
 
     document.addEventListener("click", (e) => {
@@ -173,14 +186,30 @@
     });
 
     /* ---------- 推荐 ---------- */
-    const owned = JH.state.owned;
-    const reco = JH_DATA.courses
-      .filter((c) => owned.indexOf(c.id) === -1)
-      .sort((a, b) => b.rating - a.rating)
-      .slice(0, 3);
-    JH.$("#reco").innerHTML = reco.map(JH.courseCard).join("");
+    function renderReco() {
+      const owned = JH.state.owned;
+      const reco = JH_DATA.courses
+        .filter((c) => owned.indexOf(c.id) === -1)
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 3);
+      JH.$("#reco").innerHTML = reco.map(JH.courseCard).join("");
+    }
 
-    renderList();
+    renderReco();
+    refresh();
+
+    /* 后端数据到达后（登录态恢复）重新渲染 */
+    window.JH_AFTER_CLOUD = function () {
+      const u = JH.state.user;
+      if (u) {
+        JH.$("#userAva").textContent = u.name.slice(0, 1);
+        JH.$("#greeting").textContent = "你好，" + u.name;
+        JH.$("#noticeSlot").innerHTML = "";
+      }
+      refresh();
+      renderReco();
+      JH.applyOverrides();
+    };
   </script>
 </body>
 </html>

@@ -247,6 +247,8 @@
       return;
     }
     const bought = cartCourses();
+    const total = cartTotal();
+    const ids = bought.map((c) => c.id);
     bought.forEach((c) => {
       if (state.owned.indexOf(c.id) === -1) state.owned.push(c.id);
     });
@@ -255,6 +257,10 @@
     renderBadge();
     renderCart();
     closeAll();
+    /* 连上后端时把订单写进服务器 */
+    if (window.JH_API && JH_API.online && JH_API.token) {
+      JH_API.createOrder(ids, total).catch(() => {});
+    }
     toast("支付成功，已加入我的课程");
     setTimeout(() => (location.href = "learning.html?welcome=1"), 900);
   }
@@ -454,6 +460,7 @@
   let editSpans = [];
   let applying = false;
   let lastApplyAt = 0;
+  let serverOverrides = {};
 
   function pageFile() {
     const p = location.pathname.split("/").pop();
@@ -479,7 +486,7 @@
   }
 
   function allEdits() {
-    return Object.assign({}, window.JH_OVERRIDES || {}, localEdits);
+    return Object.assign({}, window.JH_OVERRIDES || {}, serverOverrides, localEdits);
   }
 
   /* —— 文本节点定位 —— */
@@ -701,6 +708,106 @@
     reader.readAsText(file);
   }
 
+  /* —— 发布到网站（后端 / GitHub 二选一）—— */
+  async function publishEdits() {
+    const data = allEdits();
+    const count = Object.keys(data).length;
+    if (!count) {
+      toast("还没有任何修改", false);
+      return;
+    }
+    const btn = $("#epPublish");
+    const oldText = btn ? btn.textContent : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "发布中…";
+    }
+    try {
+      /* 情况一：连上了后端 —— 写进数据库，所有访客立刻可见 */
+      if (window.JH_API && JH_API.online) {
+        if (!JH_API.adminKey) {
+          $("#epSettings").classList.add("open");
+          toast("请先在「发布设置」里填写发布密码", false);
+          return;
+        }
+        const r = await JH_API.putContent(data, JH_API.adminKey);
+        serverOverrides = Object.assign({}, data);
+        toast("已发布到服务器，共 " + r.count + " 处，所有访客刷新即可看到");
+        return;
+      }
+      /* 情况二：纯静态托管 —— 直接提交到 GitHub，稍后自动生效 */
+      const info = window.JH_API ? JH_API.githubInfo() : null;
+      if (window.JH_API && info && info.hasToken) {
+        const r = await JH_API.githubPublish(data);
+        if (r.ok) toast("已提交到 GitHub" + (r.commit ? "（" + r.commit + "）" : "") + "，约 1 分钟后全站生效");
+        else toast("发布失败：" + r.error, false);
+        return;
+      }
+      /* 情况三：都没有 —— 退回导出文件 */
+      exportOverrides();
+      toast("未连接后端，已改为导出文件", false);
+    } catch (e) {
+      toast("发布失败：" + e.message, false);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = oldText;
+      }
+    }
+  }
+
+  function updateModeLabel() {
+    const el = $("#epMode");
+    if (!el) return;
+    if (!window.JH_API) {
+      el.innerHTML = '<span class="m-dot"></span>模式：本地（未加载后端脚本）';
+      return;
+    }
+    if (!JH_API.checked) {
+      el.innerHTML = '<span class="m-dot"></span>模式：正在检测后端…';
+      return;
+    }
+    if (JH_API.online) {
+      el.innerHTML =
+        '<span class="m-dot ok"></span><b>已连接后端</b>　发布后所有访客立刻可见' +
+        (JH_API.base ? "<span class='m-url'>" + esc(JH_API.base) + "</span>" : "");
+    } else {
+      const gi = JH_API.githubInfo();
+      el.innerHTML =
+        '<span class="m-dot warn"></span><b>未连接后端</b>　' +
+        (gi.hasToken ? "发布时将通过 GitHub 更新网站" : "修改只保存在本机浏览器");
+    }
+  }
+
+  function maskPhone(p) {
+    return String(p || "").replace(/(\d{3})\d{4}(\d{4})/, "$1****$2");
+  }
+
+  /* —— 启动时连后端：拉内容、恢复登录态与学习记录 —— */
+  async function bootCloud() {
+    if (!window.JH_API) return;
+    const online = await JH_API.check();
+    updateModeLabel();
+    if (!online) return;
+    try {
+      const c = await JH_API.getContent();
+      serverOverrides = (c && c.overrides) || {};
+    } catch (e) {}
+    const me = await JH_API.me();
+    if (typeof window.JH_AFTER_CLOUD === "function") window.JH_AFTER_CLOUD();
+    if (!me) return;
+    state.user = { id: me.id, name: me.name, phone: maskPhone(me.phone), cloud: true };
+    const enrolled = await JH_API.getEnrollments();
+    const pg = await JH_API.getProgress();
+    /* 登录后以服务端记录为准 */
+    state.owned = enrolled.slice();
+    state.progress = pg;
+    save();
+    renderUser();
+    renderBadge();
+    if (typeof window.JH_AFTER_CLOUD === "function") window.JH_AFTER_CLOUD();
+  }
+
   /* —— 工具条 —— */
   function mountEditor() {
     if ($("#editBar")) return;
@@ -713,11 +820,13 @@
           <b>修改页面内容</b>
           <button class="ep-close" id="epClose" aria-label="关闭">✕</button>
         </div>
-        <p class="ep-hint">打开编辑模式后，直接点击页面上的文字就能改，改完自动保存在本机浏览器里。</p>
+        <div class="ep-mode" id="epMode"><span class="m-dot"></span>模式：正在检测…</div>
+        <p class="ep-hint">点「开始编辑文字」，然后直接点页面上的文字修改。改完点「保存并发布到网站」，所有访客就都能看到。</p>
         <button class="btn btn-primary btn-block btn-sm" id="epStart">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z"/></svg>
           开始编辑文字
         </button>
+        <button class="btn btn-gold btn-block btn-sm" style="margin-top:8px" id="epPublish">保存并发布到网站</button>
         <div class="ep-row">
           <button class="btn btn-outline btn-sm" id="epUndoPage">撤销本页</button>
           <button class="btn btn-outline btn-sm" id="epUndoAll">撤销全部</button>
@@ -727,7 +836,22 @@
           <button class="btn btn-outline btn-sm" id="epImportBtn">导入修改</button>
         </div>
         <input type="file" id="epImport" accept=".js,.json" hidden />
-        <p class="ep-note">导出的文件放到 <b>assets</b> 文件夹替换同名文件，其他人访问时就能看到修改后的内容。</p>
+        <button class="ep-toggle" id="epSettingsBtn">发布设置<span class="caret">▾</span></button>
+        <div class="ep-settings" id="epSettings">
+          <label>后端地址（留空表示用当前站点）</label>
+          <input type="text" id="epApiBase" placeholder="例如 http://localhost:3000" />
+          <label>发布密码</label>
+          <input type="password" id="epAdminKey" placeholder="默认 jinghua2026" />
+          <label>GitHub 令牌（纯静态托管时用于自动上线）</label>
+          <input type="password" id="epGhToken" placeholder="github_pat_..." />
+          <div class="ep-two">
+            <input type="text" id="epGhOwner" placeholder="用户名" />
+            <input type="text" id="epGhRepo" placeholder="仓库名" />
+          </div>
+          <button class="btn btn-primary btn-sm btn-block" id="epSaveSettings">保存设置</button>
+          <button class="btn btn-outline btn-sm btn-block" id="epTestConn">测试后端连接</button>
+          <p class="ep-note">没接后端时，用 GitHub 令牌可以让静态网站也做到「改完即上线」。</p>
+        </div>
       </div>
       <button class="edit-fab" id="editFab" title="修改页面内容">
         <span class="fab-ico">
@@ -774,9 +898,47 @@
       location.reload();
     });
     $("#epExport").addEventListener("click", exportOverrides);
+    $("#epPublish").addEventListener("click", publishEdits);
     $("#epImportBtn").addEventListener("click", () => $("#epImport").click());
     $("#epImport").addEventListener("change", (e) => {
       if (e.target.files && e.target.files[0]) importOverrides(e.target.files[0]);
+    });
+    $("#epSettingsBtn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      $("#epSettings").classList.toggle("open");
+    });
+    if (window.JH_API) {
+      $("#epApiBase").value = JH_API.base || "";
+      $("#epAdminKey").value = JH_API.adminKey || "";
+      const gi = JH_API.githubInfo();
+      $("#epGhOwner").value = gi.owner;
+      $("#epGhRepo").value = gi.repo;
+    }
+    $("#epSaveSettings").addEventListener("click", async () => {
+      if (!window.JH_API) return;
+      JH_API.setBase($("#epApiBase").value);
+      JH_API.setAdminKey($("#epAdminKey").value.trim());
+      JH_API.setGithub($("#epGhOwner").value.trim(), $("#epGhRepo").value.trim(), $("#epGhToken").value.trim());
+      toast("设置已保存，正在重新检测连接");
+      JH_API.checked = false;
+      updateModeLabel();
+      const online = await JH_API.check();
+      if (online) {
+        try {
+          const c = await JH_API.getContent();
+          serverOverrides = (c && c.overrides) || {};
+          applyOverrides();
+        } catch (e) {}
+      }
+      updateModeLabel();
+    });
+    $("#epTestConn").addEventListener("click", async () => {
+      if (!window.JH_API) return false;
+      JH_API.setBase($("#epApiBase").value);
+      toast("正在测试连接…");
+      const online = await JH_API.check();
+      updateModeLabel();
+      toast(online ? "后端连接正常" : "连不上后端：" + (JH_API.lastError || "未知原因"), online ? true : false);
     });
     document.addEventListener("click", (e) => {
       if (!bar.classList.contains("open")) return;
@@ -813,8 +975,9 @@
     if (editing && e.key === "Escape") exitEdit();
   });
 
-  window.addEventListener("load", () => {
+  window.addEventListener("load", async () => {
     mountEditor();
+    await bootCloud();
     applyOverrides();
     mountReveal();
     const obs = new MutationObserver(() => {

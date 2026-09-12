@@ -113,6 +113,7 @@
 
   <script src="assets/data.js"></script>
   <script src="assets/content-overrides.js"></script>
+  <script src="assets/api.js"></script>
   <script src="assets/app.js"></script>
   <script>
     JH.mountChrome("courses");
@@ -317,6 +318,9 @@
       if (arr.indexOf(lesson.id) === -1) {
         arr.push(lesson.id);
         JH.save();
+        if (window.JH_API && JH_API.online && JH_API.token) {
+          JH_API.postProgress(course.id, lesson.id).catch(function () {});
+        }
         renderCurriculum();
         JH.toast("已完成本节：" + lesson.title);
       }
@@ -389,6 +393,9 @@
       const key = course.id + ":" + current.id;
       JH.state.notes[key] = { text: text, lesson: current.title, at: new Date().toLocaleString("zh-CN", { hour12: false }) };
       JH.save();
+      if (window.JH_API && JH_API.online && JH_API.token) {
+        JH_API.postNote(course.id, current.id, text).catch(function () {});
+      }
       renderNotes();
       JH.toast("笔记已保存");
     });

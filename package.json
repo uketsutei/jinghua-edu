@@ -1,0 +1,13 @@
+{
+  "name": "jinghua-edu-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "菁华教育网课平台 · 全栈版（静态站点 + Node/SQLite 后端）",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node server/server.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

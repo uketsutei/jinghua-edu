@@ -43,11 +43,20 @@
 
           <div class="field">
             <label for="phone">手机号</label>
-            <input id="phone" type="tel" inputmode="numeric" maxlength="11" placeholder="请输入 11 位手机号" autocomplete="tel" />
+            <div class="phone-row">
+              <input id="phone" type="tel" inputmode="numeric" maxlength="11" placeholder="请输入 11 位手机号" autocomplete="tel" />
+              <button class="btn btn-outline" type="button" id="sendCode">获取验证码</button>
+            </div>
             <div class="err" id="phoneErr"></div>
           </div>
 
-          <div class="field">
+          <div class="field hide" id="codeField">
+            <label for="code">验证码</label>
+            <input id="code" inputmode="numeric" maxlength="6" placeholder="请输入 6 位验证码" autocomplete="one-time-code" />
+            <div class="err" id="codeErr"></div>
+          </div>
+
+          <div class="field" id="pwdField">
             <label for="pwd">密码</label>
             <input id="pwd" type="password" placeholder="请输入密码（至少 6 位）" autocomplete="current-password" />
             <div class="err" id="pwdErr"></div>
@@ -83,6 +92,7 @@
 
   <script src="assets/data.js"></script>
   <script src="assets/content-overrides.js"></script>
+  <script src="assets/api.js"></script>
   <script src="assets/app.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
@@ -90,6 +100,7 @@
     const next = /^[\w.-]+\.html(\?.*)?$/.test(rawNext) || rawNext === "checkout" ? rawNext : "";
 
     let mode = params.get("mode") === "register" ? "register" : "login";
+    let cloud = false;
 
     const els = {
       title: document.getElementById("formTitle"),
@@ -98,6 +109,9 @@
       name: document.getElementById("name"),
       phone: document.getElementById("phone"),
       pwd: document.getElementById("pwd"),
+      code: document.getElementById("code"),
+      codeField: document.getElementById("codeField"),
+      pwdField: document.getElementById("pwdField"),
       switchText: document.getElementById("switchText"),
       switchBtn: document.getElementById("switchBtn"),
       submit: document.getElementById("submitBtn"),
@@ -107,12 +121,18 @@
     function paint() {
       const isLogin = mode === "login";
       els.title.textContent = isLogin ? "欢迎回来" : "创建你的学习账号";
-      els.hint.textContent = isLogin ? "使用手机号登录，继续你的学习计划。" : "注册后可免费试听任意课程的第一节完整课时。";
+      els.hint.textContent = cloud
+        ? "输入手机号，点「获取验证码」即可登录或自动注册。"
+        : isLogin
+        ? "使用手机号登录，继续你的学习计划。"
+        : "注册后可免费试听任意课程的第一节完整课时。";
       els.nameField.classList.toggle("hide", isLogin);
+      els.codeField.classList.toggle("hide", !cloud);
+      els.pwdField.classList.toggle("hide", cloud);
       els.switchText.textContent = isLogin ? "还没有账号？" : "已经有账号了？";
       els.switchBtn.textContent = isLogin ? "免费注册" : "去登录";
       els.submit.textContent = isLogin ? "登录" : "注册并开始学习";
-      ["phoneErr", "pwdErr", "nameErr"].forEach((id) => (document.getElementById(id).textContent = ""));
+      ["phoneErr", "pwdErr", "nameErr", "codeErr"].forEach((id) => (document.getElementById(id).textContent = ""));
     }
 
     function setErr(id, msg) {
@@ -141,6 +161,7 @@
       const name = els.name.value.trim();
       const phone = els.phone.value.trim();
       const pwd = els.pwd.value;
+      const code = els.code.value.trim();
       let ok = true;
 
       if (mode === "register" && name.length < 1) {
@@ -151,16 +172,58 @@
         setErr("phoneErr", "请输入 11 位有效手机号");
         ok = false;
       }
-      if (pwd.length < 6) {
+      if (cloud && !/^\d{6}$/.test(code)) {
+        setErr("codeErr", "请输入 6 位验证码");
+        ok = false;
+      }
+      if (!cloud && pwd.length < 6) {
         setErr("pwdErr", "密码至少需要 6 位");
         ok = false;
       }
       if (!ok) return;
 
+      if (cloud) {
+        els.submit.disabled = true;
+        els.submit.textContent = "登录中…";
+        JH_API.login(phone, code, mode === "register" ? name : "")
+          .then((r) => finish({ name: r.user.name, phone: r.user.phone, id: r.user.id, cloud: true }))
+          .catch((err) => {
+            setErr("codeErr", err.message);
+            els.submit.disabled = false;
+            paint();
+          });
+        return;
+      }
+
       finish({
         name: mode === "register" ? name : "同学",
         phone: phone.replace(/(\d{3})\d{4}(\d{4})/, "$1****$2")
       });
+    });
+
+    document.getElementById("sendCode").addEventListener("click", async () => {
+      const phone = els.phone.value.trim();
+      if (!/^1\d{10}$/.test(phone)) {
+        setErr("phoneErr", "请先填写 11 位手机号");
+        return;
+      }
+      const btn = document.getElementById("sendCode");
+      btn.disabled = true;
+      btn.textContent = "发送中…";
+      try {
+        const r = await JH_API.sendCode(phone);
+        if (r.devCode) {
+          els.code.value = r.devCode;
+          JH.toast("演示环境验证码已自动填入：" + r.devCode);
+        } else {
+          JH.toast("验证码已发送");
+        }
+      } catch (e) {
+        setErr("phoneErr", e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "获取验证码";
+      }
     });
 
     els.switchBtn.addEventListener("click", () => {
@@ -179,6 +242,17 @@
     });
 
     paint();
+
+    /* 检测后端：连得上就走真实的验证码登录 */
+    (async () => {
+      if (!window.JH_API) return;
+      cloud = await JH_API.check();
+      if (cloud) {
+        document.querySelector(".demo-tip").innerHTML =
+          "已连接后端服务，登录信息会保存到服务器，换设备也能看到你的学习记录。";
+      }
+      paint();
+    })();
   </script>
 </body>
 </html>
